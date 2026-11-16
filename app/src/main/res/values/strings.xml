@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">Peach TimeGuard</string>
+    <string name="svc_desc">ตรวจว่าแอปไหนเปิดอยู่ เพื่อนับเวลาและล็อกแอปเมื่อหมดเวลา</string>
+</resources>
