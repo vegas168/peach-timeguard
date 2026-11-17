@@ -32,7 +32,7 @@ class PinActivity : Activity() {
         }
         val title = TextView(this).apply {
             textSize = 24f; setTextColor(Color.WHITE); gravity = Gravity.CENTER
-            text = pkg?.let { "หมดเวลาใช้ ${label(it)} แล้ว\nใส่ PIN เพื่อใช้ต่ออีก ${Store.grantMin(this@PinActivity)} นาที" } ?: "ใส่ PIN"
+            text = pkg?.let { "${label(it)} ถูกล็อก\nใส่ PIN เพื่อปลดล็อก (ถ้าหมดเวลา จะได้เวลาเพิ่ม ${Store.grantMin(this@PinActivity)} นาที)" } ?: "ใส่ PIN"
         }
         dots = TextView(this).apply { textSize = 32f; setTextColor(Color.WHITE); gravity = Gravity.CENTER; text = " " }
         msg = TextView(this).apply { textSize = 16f; setTextColor(0xFFFF9E8F.toInt()); gravity = Gravity.CENTER; text = " " }

@@ -14,6 +14,9 @@ import android.widget.ListView
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
+import java.net.Inet4Address
+import java.net.NetworkInterface
+import java.util.Collections
 
 class MainActivity : Activity() {
     private data class App(val pkg: String, val label: String)
@@ -23,6 +26,7 @@ class MainActivity : Activity() {
     private lateinit var status: TextView
     private lateinit var list: ListView
     private lateinit var grantBtn: Button
+    private lateinit var urlView: TextView
 
     private val dayShort = arrayOf("จ.", "อ.", "พ.", "พฤ.", "ศ.", "ส.", "อา.")
     private val dayNames = arrayOf("จันทร์", "อังคาร", "พุธ", "พฤหัสบดี", "ศุกร์", "เสาร์", "อาทิตย์")
@@ -59,6 +63,8 @@ class MainActivity : Activity() {
         root.addView(TextView(this).apply { text = "Peach TimeGuard — จำกัดเวลาใช้แอป"; textSize = 26f })
         status = TextView(this).apply { textSize = 16f }
         root.addView(status)
+        urlView = TextView(this).apply { textSize = 16f; setTextIsSelectable(true) }
+        root.addView(urlView)
 
         val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
         row.addView(Button(this).apply {
@@ -73,6 +79,20 @@ class MainActivity : Activity() {
             }
         }
         row.addView(grantBtn)
+        row.addView(Button(this).apply {
+            text = "เปลี่ยนรหัสมือถือ"
+            setOnClickListener { Store.renewToken(this@MainActivity); reload() }
+        })
+        row.addView(Button(this).apply {
+            text = "ดูบันทึกการทำงาน"
+            setOnClickListener {
+                AlertDialog.Builder(this@MainActivity).setTitle("บันทึกการทำงานของบริการ")
+                    .setMessage(Diag.text(this@MainActivity))
+                    .setPositiveButton("ปิด", null)
+                    .setNeutralButton("ล้าง") { _, _ -> Diag.clear(this@MainActivity) }
+                    .show()
+            }
+        })
         root.addView(row)
 
         list = ListView(this)
@@ -80,6 +100,18 @@ class MainActivity : Activity() {
         root.addView(list, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f))
         setContentView(root)
         reload()
+    }
+
+    private fun localIp(): String {
+        try {
+            for (ni in Collections.list(NetworkInterface.getNetworkInterfaces())) {
+                if (!ni.isUp || ni.isLoopback) continue
+                for (a in Collections.list(ni.inetAddresses)) {
+                    if (a is Inet4Address && !a.isLoopbackAddress) return a.hostAddress ?: "?"
+                }
+            }
+        } catch (e: Exception) { }
+        return "?"
     }
 
     private fun summary(a: App): String {
@@ -91,6 +123,7 @@ class MainActivity : Activity() {
     private fun reload() {
         status.text = if (svcOn()) "✅ บริการทำงานอยู่" else "⚠️ ยังไม่ได้เปิดบริการ Accessibility (กดปุ่มแรก แล้วเปิด Peach TimeGuard)"
         grantBtn.text = "เวลาเพิ่มเมื่อใส่ PIN: ${Store.grantMin(this)} นาที"
+        urlView.text = "เปิดจากมือถือ (Wi-Fi เดียวกัน):  http://${localIp()}:8765/?t=${Store.token(this)}"
         val pm = packageManager
         val out = LinkedHashMap<String, App>()
         for (cat in listOf(Intent.CATEGORY_LEANBACK_LAUNCHER, Intent.CATEGORY_LAUNCHER)) {

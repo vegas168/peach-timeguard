@@ -20,7 +20,7 @@ object Store {
         val s = sp(c)
         if (s.getString("day", "") == today()) return
         val e = s.edit()
-        s.all.keys.filter { it.startsWith("used_") || it.startsWith("extra_") }.forEach { e.remove(it) }
+        s.all.keys.filter { it.startsWith("used_") || it.startsWith("extra_") || it.startsWith("force_") }.forEach { e.remove(it) }
         e.putString("day", today()).apply()
     }
 
@@ -32,7 +32,7 @@ object Store {
         sp(c).edit().putString("rule_$pkg", v.joinToString(",")).apply()
 
     fun removeRule(c: Context, pkg: String) =
-        sp(c).edit().remove("rule_$pkg").remove("used_$pkg").remove("extra_$pkg").apply()
+        sp(c).edit().remove("rule_$pkg").remove("used_$pkg").remove("extra_$pkg").remove("force_$pkg").apply()
 
     fun used(c: Context, pkg: String) = sp(c).getInt("used_$pkg", 0)
 
@@ -51,6 +51,7 @@ object Store {
     fun isBlocked(c: Context, pkg: String): Boolean {
         if (!hasPin(c)) return false // ยังไม่ตั้ง PIN จะไม่ล็อก กันล็อกแล้วเข้าไม่ได้
         rollover(c)
+        if (isForced(c, pkg)) return true
         val lim = limitSec(c, pkg) ?: return false
         return used(c, pkg) >= lim
     }
@@ -60,9 +61,43 @@ object Store {
 
     /** ใส่ PIN ถูก: ให้เวลาเพิ่ม grantMin นาที นับจากตอนนี้ */
     fun grant(c: Context, pkg: String) {
+        forceLock(c, pkg, false)
         val v = rule(c, pkg)?.get(dayIndex()) ?: return
-        sp(c).edit().putInt("extra_$pkg", used(c, pkg) + grantMin(c) * 60 - maxOf(v, 0) * 60).apply()
+        val lim = limitSec(c, pkg) ?: return
+        if (used(c, pkg) >= lim)
+            sp(c).edit().putInt("extra_$pkg", used(c, pkg) + grantMin(c) * 60 - maxOf(v, 0) * 60).apply()
     }
+
+    /** ผู้ปกครองสั่งล็อก/ปลดล็อกจากมือถือ (ล็อกถึงเที่ยงคืน) */
+    fun forceLock(c: Context, pkg: String, on: Boolean) {
+        val e = sp(c).edit()
+        if (on) e.putBoolean("force_$pkg", true) else e.remove("force_$pkg")
+        e.apply()
+    }
+
+    fun isForced(c: Context, pkg: String) = sp(c).getBoolean("force_$pkg", false)
+
+    /** เพิ่มเวลาให้แอปวันนี้ (นาที) และปลดล็อกที่สั่งไว้ */
+    fun addExtra(c: Context, pkg: String, min: Int) {
+        forceLock(c, pkg, false)
+        val s = sp(c)
+        s.edit().putInt("extra_$pkg", s.getInt("extra_$pkg", 0) + min * 60).apply()
+    }
+
+    /** แอปที่มีกฎหรือถูกสั่งล็อก */
+    fun managed(c: Context): List<String> =
+        sp(c).all.keys.filter { it.startsWith("rule_") || it.startsWith("force_") }
+            .map { it.substringAfter("_") }.distinct().sorted()
+
+    // รหัส (token) สำหรับให้มือถือเรียกทีวี
+    private fun newToken() = ByteArray(6).also { SecureRandom().nextBytes(it) }.joinToString("") { "%02x".format(it) }
+
+    fun token(c: Context): String {
+        val s = sp(c)
+        return s.getString("web_token", null) ?: newToken().also { s.edit().putString("web_token", it).apply() }
+    }
+
+    fun renewToken(c: Context) = sp(c).edit().putString("web_token", newToken()).apply()
 
     fun hasPin(c: Context) = sp(c).contains("pin_hash")
 
